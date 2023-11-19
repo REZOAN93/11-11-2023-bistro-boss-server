@@ -37,12 +37,9 @@ async function run() {
       res.send({token})
     })
 
-
     // Verify token middeleware
-
     const verifytoken=(req,res,next)=>{
-      console.log('Inside Verify token',req.headers.authorization)
-      if (!req.headers?.authorization) {
+      if (!req.headers.authorization) {
         return res.status(401).send({message:'Forbidden Access'})
       }
      const token=req.headers.authorization.split(' ')[1]
@@ -51,29 +48,52 @@ async function run() {
       if (err) {
         return res.status(401).send({message:'Forbidden Access'})
       }
-      req.decoded=decoded
+      req.decoded=decoded;
       next()
     })
     }
 
-
+// user verify admin after verify token
+    const verifyAdmin=async(req,res,next)=>{
+      const email=req.decoded.email;
+      const query={email:email}
+      const user=await userCollection.findOne(query)
+      const isAdmin=user?.role==='admin'
+      if (!isAdmin) {
+        return res.status(403).send({message:'forbidden access'})
+      }
+      next()
+    }
 
     // users Related APi
-
-    app.get('/users',verifytoken,async(req,res)=>{
+    app.get('/users',verifytoken,verifyAdmin,async(req,res)=>{
       const result=await userCollection.find().toArray()
       res.send(result)
     })
 
-    app.delete('/users/:id',async(req,res)=>{
+    app.get('/user/admin/:email',verifytoken, async(req,res)=>{
+      const email=req.params.email
+      if (email!== req.decoded.email) {
+        return res.status(403).send({message: 'Unauthorized'})
+      }
+      const query={email:email}
+      const user=await userCollection.findOne(query)
+      let isAdmin= false;
+      if (user) {
+        isAdmin=user?.role==='admin'
+      }
+      res.send({isAdmin})
+    })
+
+    app.delete('/users/:id',verifytoken,verifyAdmin,async(req,res)=>{
       const deleteId=req.params.id;
       const query = { _id: new ObjectId(deleteId) };
       const result = await userCollection.deleteOne(query);
       res.send(result)
-      console.log(result)
+      // console.log(result)
     })
 
-    app.patch('/users/admin/:id',async(req,res)=>{
+    app.patch('/users/admin/:id',verifytoken,verifyAdmin,async(req,res)=>{
       const id=req.params.id;
       const filter={_id:new ObjectId(id)}
       const updatedDocs={
@@ -96,10 +116,8 @@ async function run() {
       }
       const result=await userCollection.insertOne(user)
       res.send(result)
-      console.log(result)
+      // console.log(result)
     })
-
-
     app.get('/menu',async(req,res)=>{
         const cursor = menuCollection.find();
         const data=await cursor.toArray()
@@ -116,7 +134,7 @@ async function run() {
       const cartItem=req.body;
       const result = await cartCollection.insertOne(cartItem);
      res.send(result)
-     console.log(result)
+    //  console.log(result)
    })
 
    app.get('/carts',async(req,res)=>{
@@ -133,7 +151,7 @@ async function run() {
     const query = { _id: new ObjectId(deleteID) };
     const result = await cartCollection.deleteOne(query);
     res.send(result)
-    console.log(result)
+    // console.log(result)
    })
 
     // Nameing convention
@@ -157,5 +175,5 @@ run().catch(console.dir);
 // })
 
 app.listen(port, function () {
-  console.log('CORS-enabled web server listening on port 80')
+  // console.log('CORS-enabled web server listening on port 80')
 })
