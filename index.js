@@ -118,16 +118,60 @@ async function run() {
       res.send(result)
       // console.log(result)
     })
+    
     app.get('/menu',async(req,res)=>{
         const cursor = menuCollection.find();
         const data=await cursor.toArray()
         res.send(data)
     })
+
+    app.get('/menu/:id',async(req,res)=>{
+      const getID=req.params.id;
+      const query = { _id: getID };
+      const result = await menuCollection.findOne(query);
+      res.send(result)
+  })
+
+  app.patch('/updateItems/:id', async(req,res)=>{
+    const getID=req.params.id;
+    const updatedData=req.body;
+    console.log(getID)
+    const filter = { _id: getID };
+    const options = { upsert: true };
+    const updateddocs={
+      $set:{
+        name: updatedData.name,
+        category: updatedData.category,
+        recipe: updatedData.recipe,
+        image: updatedData.image,
+        price: updatedData.price
+      }
+    }
+    const result= await menuCollection.updateOne(filter, updateddocs, options)
+    res.send(result)
+    console.log(result)
+  })
+  
+    app.delete('/menu/:id',verifytoken,verifyAdmin,async(req,res)=>{
+      const deleteId=req.params.id;
+      const query = { _id: new ObjectId(deleteId) };
+      const result = await menuCollection.deleteOne(query);
+      res.send(result)
+      // console.log(result)
+    })
+
     app.get('/reviews',async(req,res)=>{
         const cursor = reviewCollection.find();
         const data=await cursor.toArray()
         res.send(data)
     })
+
+    app.post('/additems',verifytoken,verifyAdmin,async(req,res)=>{
+      const data=req.body
+      const result=await menuCollection.insertOne(data)
+      res.send(result)
+    })
+    
 
     // cart collection
    app.post('/carts',async(req,res)=>{
