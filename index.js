@@ -8,6 +8,13 @@ app.use(cors())
 app.use(express.json())
 require('dotenv').config()
 
+//------------------------------------------------------------------//
+// Payment GateWay
+const stripe = require("stripe")(process.env.STRIPS_SECRET_KEY);
+app.use(express.static("public"));
+app.use(express.json());
+// -------------------------------------------//
+
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.S3_BUCKET}:${process.env.SECRET_KEY}@cluster0.lh0lzsv.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -52,6 +59,31 @@ async function run() {
       next()
     })
     }
+
+
+// Payment GateWay
+  //--------------------------------------------------------------------------------------------//
+  // Create a PaymentIntent with the order amount and currency
+  app.post("/create-payment-intent", async (req, res) => {
+    const { price } = req.body;
+    const amount=parseInt(price*100)
+    const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount,
+    currency: "usd",
+    payment_method_types: ["card"],
+    // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+    // automatic_payment_methods: {
+    //   enabled: true,
+    // },
+  });
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+//--------------------------------------------------------------------------------------------//
+
+
+
 
 // user verify admin after verify token
     const verifyAdmin=async(req,res,next)=>{
@@ -154,7 +186,7 @@ async function run() {
   
     app.delete('/menu/:id',verifytoken,verifyAdmin,async(req,res)=>{
       const deleteId=req.params.id;
-      const query = { _id: new ObjectId(deleteId) };
+      const query = { _id:deleteId};
       const result = await menuCollection.deleteOne(query);
       res.send(result)
       // console.log(result)
