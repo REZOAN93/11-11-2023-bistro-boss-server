@@ -36,6 +36,7 @@ async function run() {
     const reviewCollection= database.collection("reviewCollection");
     const cartCollection= database.collection("cartCollection");
     const userCollection= database.collection("userCollection");
+    const paymentCollection= database.collection("paymentCollection");
 
     // JWT Related API
     app.post('/jwt',async(req,res)=>{
@@ -66,6 +67,7 @@ async function run() {
   // Create a PaymentIntent with the order amount and currency
   app.post("/create-payment-intent", async (req, res) => {
     const { price } = req.body;
+    console.log(price,"Price in the server for payment")
     const amount=parseInt(price*100)
     const paymentIntent = await stripe.paymentIntents.create({
     amount: amount,
@@ -218,7 +220,7 @@ async function run() {
     const query={email:email}
     const cursor = cartCollection.find(query);
     const data=await cursor.toArray()
-    res.send(data)
+    res.send(data) 
    })
 
 
@@ -229,6 +231,58 @@ async function run() {
     res.send(result)
     // console.log(result)
    })
+
+
+   app.post('/payments',async(req,res)=>{
+    const payment=req.body;
+    console.log(payment)
+    const paymentresult=await paymentCollection.insertOne(payment)
+    // carefully delete each item from the cart
+    const query={
+      _id:{
+        $in:payment.cartId.map(na=>new ObjectId(na))
+      }
+    }
+    const deleteResult=await cartCollection.deleteMany(query)
+    res.send({paymentresult,deleteResult})
+    console.log(payment,deleteResult,'payment Saved')
+  })
+
+
+  app.get('/payments/:email',verifytoken,async(req,res)=>{
+      if (req.params.email!== req.decoded.email) {
+        return res.status(403).send({message: 'Unauthorized'})
+      }
+    const query={email: req.params.email}
+    const result= await paymentCollection.find(query).toArray()
+    res.send(result)
+  })
+
+  // State for Analysis
+
+  app.get('/admin-state',verifytoken,verifyAdmin,async(req,res)=>{
+    const users=await userCollection.estimatedDocumentCount()
+    const menuItems=await menuCollection.estimatedDocumentCount()
+    const orders=await paymentCollection.estimatedDocumentCount()
+
+    // this is not the best way
+    // const payments= await paymentCollection.find().toArray()
+    // const revenue=payments.reduce((total,payment)=>total+payment.price,0)
+
+    const result= await paymentCollection.aggregate([
+      {
+        $group:{
+          _id:null,
+          totalRevenue:{
+            $sum:'$price'
+          }
+        }
+      }
+    ]).toArray()
+    const revenue=result.length>0?result[0].totalRevenue:0;
+    res.send({users,menuItems,orders,revenue})
+  })
+
 
     // Nameing convention
     // app.get('/users')
